@@ -86,7 +86,7 @@ jobs:
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy $IMAGE" \
+            --comment "Deploy app" \
             --parameters commands="sudo /opt/deploy/deploy.sh $IMAGE" \
             --query "Command.CommandId" --output text)
           echo "SSM command: $CMD_ID"
@@ -120,7 +120,7 @@ jobs:
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Prod deploy $IMAGE" \
+            --comment "Prod deploy app" \
             --parameters commands="sudo /opt/deploy/deploy.sh $IMAGE" \
             --query "Command.CommandId" --output text)
           aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
