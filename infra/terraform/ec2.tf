@@ -1,10 +1,10 @@
-data "aws_ami" "al2023" {
+data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
   filter {
     name   = "architecture"
@@ -13,7 +13,7 @@ data "aws_ami" "al2023" {
 }
 
 resource "aws_instance" "app" {
-  ami                         = data.aws_ami.al2023.id
+  ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.app_instance_type
   subnet_id                   = aws_subnet.public[0].id
   vpc_security_group_ids      = [aws_security_group.app.id]
@@ -30,7 +30,7 @@ resource "aws_instance" "app" {
     volume_size = 20
   }
 
-  user_data = templatefile("${path.module}/files/app_user_data.sh.tftpl", {
+  user_data = templatefile("${path.module}/files/app_user_data.sh", {
     region     = var.aws_region
     secret_arn = aws_secretsmanager_secret.db.arn
     app_image  = var.app_image
@@ -40,8 +40,7 @@ resource "aws_instance" "app" {
     app_port   = var.app_port
   })
 
-  # Deploys happen through SSM (Part 2), not by rebuilding the box, so don't
-  # let user_data / AMI drift trigger a replacement.
+
   lifecycle {
     ignore_changes = [user_data, ami]
   }
