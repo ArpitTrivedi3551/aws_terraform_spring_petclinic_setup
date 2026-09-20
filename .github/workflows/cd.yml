@@ -78,6 +78,7 @@ jobs:
           APP_TAG: ${{ vars.APP_INSTANCE_TAG }}
         run: |
           set -euo pipefail
+          IMAGE="${{vars.IMAGE_NAME}}:$(echo ${{ github.sha }} | cut -c1-7)"
           echo "IMAGE value is: [$IMAGE]"
           if [ -z "$IMAGE" ]; then
             echo "build-push produced no image output"
@@ -125,6 +126,7 @@ jobs:
           PROD_TAG: ${{ vars.PROD_INSTANCE_TAG }}
         run: |
           set -euo pipefail
+          IMAGE="${{vars.IMAGE_NAME}}:$(echo ${{ github.sha }} | cut -c1-7)"
           echo "IMAGE value is: [$IMAGE]"
           if [ -z "$IMAGE" ]; then
             echo "build-push produced no image output"
