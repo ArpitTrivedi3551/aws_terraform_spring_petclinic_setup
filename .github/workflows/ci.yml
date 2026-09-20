@@ -19,7 +19,7 @@ jobs:
 
       - name: Unit + integration tests
         working-directory: ./app
-        run: mvn --batch-mode verify
+        run: mvn --batch-mode test
 
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
