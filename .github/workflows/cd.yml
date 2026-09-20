@@ -28,13 +28,13 @@ jobs:
         id: meta
         run: |
           SHORT_SHA=$(git rev-parse --short=7 HEAD)
-          echo "image=${{ vars.IMAGE_NAME}}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ vars.IMAGE_NAME }}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "Computed image: ${{ vars.IMAGE_NAME }}:${SHORT_SHA}"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build image
+      - name: Build image (amd64, load locally to scan before push)
         uses: docker/build-push-action@v6
         with:
           context: ./app
@@ -73,26 +73,37 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Deploy to staging via SSM
+        env:
+          IMAGE: ${{ needs.build-push.outputs.image }}
+          APP_TAG: ${{ vars.APP_INSTANCE_TAG }}
         run: |
           set -euo pipefail
-          IMAGE="${{ needs.build-push.outputs.image }}"
-          if [ -z "$IMAGE"n]; then echo "build-path produced no image output"; exit 1; fi
+          echo "IMAGE value is: [$IMAGE]"
+          if [ -z "$IMAGE" ]; then
+            echo "build-push produced no image output"
+            exit 1
+          fi
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${{ vars.APP_INSTANCE_TAG }}" \
-                      "Name=instance-state-name,Values=running" \
+            --filters "Name=tag:Name,Values=$APP_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[].Instances[].InstanceId" --output text)
-          if [ -z "$INSTANCE_ID" ]; then echo "No running staging instance for tag ${{ vars.APP_INSTANCE_TAG }}"; exit 1; fi
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "No running staging instance for tag $APP_TAG"
+            exit 1
+          fi
           echo "Deploying $IMAGE to $INSTANCE_ID"
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy app" \
-            --parameters commands="sudo /opt/deploy/deploy.sh $IMAGE" \
+            --comment "Deploy to staging" \
+            --parameters "{\"commands\":[\"sudo /opt/deploy/deploy.sh $IMAGE\"]}" \
             --query "Command.CommandId" --output text)
           echo "SSM command: $CMD_ID"
           aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
           STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query Status --output text)
           echo "Result: $STATUS"
+          echo "----- stdout -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text || true
+          echo "----- stderr -----"
           aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardErrorContent --output text || true
           [ "$STATUS" = "Success" ]
 
@@ -109,20 +120,31 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Deploy to production via SSM
+        env:
+          IMAGE: ${{ needs.build-push.outputs.image }}
+          PROD_TAG: ${{ vars.PROD_INSTANCE_TAG }}
         run: |
           set -euo pipefail
-          IMAGE="${{ needs.build-push.outputs.image }}"
+          echo "IMAGE value is: [$IMAGE]"
+          if [ -z "$IMAGE" ]; then
+            echo "build-push produced no image output"
+            exit 1
+          fi
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${{ vars.PROD_INSTANCE_TAG }}" \
-                      "Name=instance-state-name,Values=running" \
+            --filters "Name=tag:Name,Values=$PROD_TAG" "Name=instance-state-name,Values=running" \
             --query "Reservations[].Instances[].InstanceId" --output text)
-          if [ -z "$INSTANCE_ID" ]; then echo "No running production instance for tag ${{ vars.PROD_INSTANCE_TAG }}"; exit 1; fi
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "No running production instance for tag $PROD_TAG"
+            exit 1
+          fi
+          echo "Deploying $IMAGE to $INSTANCE_ID"
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Prod deploy app" \
-            --parameters commands="sudo /opt/deploy/deploy.sh $IMAGE" \
+            --comment "Deploy to production" \
+            --parameters "{\"commands\":[\"sudo /opt/deploy/deploy.sh $IMAGE\"]}" \
             --query "Command.CommandId" --output text)
+          echo "SSM command: $CMD_ID"
           aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" || true
           STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query Status --output text)
           echo "Result: $STATUS"
