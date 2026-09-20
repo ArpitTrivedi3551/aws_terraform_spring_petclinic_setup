@@ -76,7 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           IMAGE="${{ needs.build-push.outputs.image }}"
-          if [ -z "$IMAGE"]; then "build-path produced no image output"; exit 1; fi
+          if [ -z "$IMAGE"n]; then echo "build-path produced no image output"; exit 1; fi
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${{ vars.APP_INSTANCE_TAG }}" \
                       "Name=instance-state-name,Values=running" \
