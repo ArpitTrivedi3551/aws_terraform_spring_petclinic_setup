@@ -1,0 +1,5 @@
+bucket         = "8byte-assesment-tfstate-672937918844"
+key            = "devops-assessment/staging/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "8byte-assesment-tf-locks"
+encrypt        = true
